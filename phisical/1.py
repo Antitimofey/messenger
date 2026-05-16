@@ -1,66 +1,69 @@
 import sys
-import threading
 from pathlib import Path
+import time
 
-# Добавляем корень проекта в пути
+# Настройка путей
 root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root))
 
 from phisical.physical import COMPort
 from channel.stack.requirements import COMPortSettings
-from channel.frame.encryptedFrame import EncryptedFrame
-from channel.frame.frame import FrameType
+from channel.stack.serialTracker import SerialTracker
 
 MY_ADDR = 1
 BROADCAST = 0
 
-def receive_thread(rx_port, tx_port):
-    buffer = bytearray()
-    while True:
-        byte = rx_port.receive_bytes(1)
-        if byte:
-            buffer.extend(byte)
-            if len(buffer) >= 2 and buffer[0] == 0x7E and buffer[-1] == 0x7E:
-                try:
-                    frame = EncryptedFrame(raw_bytes=bytes(buffer))
-                    if frame.src_addr == MY_ADDR:
-                        print("\n🔄 Мое сообщение вернулось (круг пройден).")
-                    else:
-                        if frame.dest_addr == MY_ADDR or frame.dest_addr == BROADCAST:
-                            print(f"\n📥 Сообщение от {frame.src_addr}: {frame.get_data_as_text()}")
-                        if frame.dest_addr != MY_ADDR:
-                            print(f"⏩ Ретрансляция сообщения от {frame.src_addr}...")
-                            tx_port.send_bytes(bytes(buffer))
-                except Exception as e:
-                    print(f"\n⚠️ Ошибка кадра: {e}")
-                finally:
-                    buffer.clear()
-                    print("> ", end="", flush=True)
-
 def main():
+    # Настройки портов
     rx_set = COMPortSettings(port_name='COM15', baudrate=19200)
     tx_set = COMPortSettings(port_name='COM10', baudrate=19200)
     
     rx = COMPort('input', rx_set)
     tx = COMPort('output', tx_set)
     
-    if not rx.open_port() or not tx.open_port():
-        print("❌ Не удалось открыть порты!")
+    # Инициализируем трекер
+    tracker = SerialTracker(rx, tx, my_addr=MY_ADDR, broadcast_addr=BROADCAST)
+    
+    try:
+        # Запускаем фоновое прослушивание (внутри создается поток)
+        tracker.start_listening()
+        print(f"=== Узел {MY_ADDR} запущен (Tracker Mode) ===")
+        print("Команды: send <addr> <msg>, exit")
+    except Exception as e:
+        print(f"❌ Ошибка запуска: {e}")
         return
-
-    print(f"=== Узел {MY_ADDR} запущен. Команды: send <addr> <msg>, exit ===")
-    threading.Thread(target=receive_thread, args=(rx, tx), daemon=True).start()
 
     while True:
         try:
-            inp = input("> ").split(" ", 2)
-            if inp[0] == "exit": break
-            if inp[0] == "send" and len(inp) == 3:
-                dest = BROADCAST if inp[1].lower() == "broadcast" else int(inp[1])
-                msg = EncryptedFrame(dest, MY_ADDR, FrameType.DATA, inp[2].encode('utf-8'))
-                tx.send_bytes(msg.encrypted_serialize())
-        except KeyboardInterrupt: break
-        except Exception as e: print(f"Ошибка: {e}")
+            # Периодически можно проверять очередь, если нужно программно обработать данные
+            # В данном тесте tracker сам печатает в консоль из фонового потока
+            msg_data = tracker.get_message()
+            if msg_data:
+                # Здесь можно добавить доп. логику обработки принятого сообщения
+                pass
+
+            cmd_input = input("> ").split(" ", 2)
+            if not cmd_input or cmd_input[0] == "": continue
+            
+            cmd = cmd_input[0].lower()
+            
+            if cmd == "exit":
+                break
+                
+            if cmd == "send" and len(cmd_input) == 3:
+                dest = BROADCAST if cmd_input[1].lower() == "broadcast" else int(cmd_input[1])
+                text = cmd_input[2]
+                tracker.send_message(dest, text)
+                print(f"📤 Команда на отправку ушла...")
+                
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            print(f"⚠️ Ошибка: {e}")
+
+    tracker.stop_listening()
+    rx.close_port()
+    tx.close_port()
 
 if __name__ == "__main__":
     main()

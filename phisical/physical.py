@@ -113,3 +113,16 @@ class COMPort:
 
     def set_debug(self, state: bool):
         self.debug_mode = state
+
+
+def get_available_ports() -> List[str]:
+    """Возвращает простой список имен доступных COM-портов."""
+    return [port.device for port in serial.tools.list_ports.comports()]
+
+def list_ports_with_details() -> List[tuple[str, str, str]]:
+    """
+    Возвращает список доступных COM-портов с деталями.
+    Формат: (имя_порта, описание, ID_оборудования)
+    """
+    ports = serial.tools.list_ports.comports()
+    return [(port.device, port.description, port.hwid) for port in ports]
