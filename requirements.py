@@ -37,13 +37,12 @@ def save_settings(settings: SerialSettings) -> dict[str, Any]:
   return {"ok": False, "error": "not implemented"}
 
 
-def open_physical_channel() -> dict[str, Any]:
+def open_physical_channel(PortInput, PortOutput) -> dict[str, Any]:
   """
   Аргументы:
-    нет
+    порт1, порт2
 
   Что делать:
-    • Открыть ОБА порта с сохранёнными параметрами.
     • Держать канал до close_physical_channel.
     • Если уже открыто — идемпотентно вернуть успех с текущими ports.
 
@@ -179,21 +178,26 @@ def send_message(text: str, destination: Destination) -> dict[str, Any]:
     ... другие ошибки ...
     {"ok": False, "error": "Пустое сообщение"}
   """
+
   return {"ok": False, "error": "not implemented"}
+
+def get_message() -> dict[str, Any]:
+  """
+  Аргументы:
+    нет
+
   Что делать:
-    • Открыть ОБА порта с сохранёнными параметрами.
-    • Держать канал до close_physical_channel.
-    • Если уже открыто — идемпотентно вернуть успех с текущими ports.
+    • если вызвалась функция, то либо возвращать последнее сообщение из очереди, либо ошибку и удалять последнее
+    сообщение из очереди
 
   Возврат при успехе:
-    {"ok": True, "ports": ["COM1", "COM2"]}
+    {"ok": True, "message": "..."}
 
   Возврат при ошибке:
-    {"ok": False, "error": "COM1 занят другим приложением"}
-    {"ok": False, "error": "Сначала сохраните параметры соединения"}
-  """
-  return {"ok": False, "error": "not implemented"}
+    {"ok": False, "error": "..."}
+  """"
 
+  return {"ok": False, "error": "not implemented"}
 
 def close_physical_channel() -> dict[str, Any]:
   """
