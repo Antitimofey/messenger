@@ -2,39 +2,40 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected'
 
 export type FrameTypeCode = 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05
 
-export type ParityOption = 'none' | 'even' | 'odd' | 'mark' | 'space'
-export type FlowControlOption = 'none' | 'hardware' | 'software'
+/** Код четности pyserial / COMPortSettings.parity */
+export type ParityCode = 'N' | 'E' | 'O'
+
 export type NodeAddress = 1 | 2 | 3
 export type Destination = NodeAddress | 'broadcast'
 
+/** Параметры линии (без имени порта) — соответствует полям COMPortSettings в physical.py */
+export interface PortLineSettings {
+  baudrate: number
+  bytesize: 5 | 6 | 7 | 8
+  parity: ParityCode
+  stopbits: 1 | 1.5 | 2
+  timeout: number
+}
+
+/**
+ * Параметры COM-порта — зеркало dataclass COMPortSettings из phisical/physical.py
+ */
+export interface COMPortSettings {
+  portName: string
+  baudrate: number
+  bytesize: 5 | 6 | 7 | 8
+  parity: ParityCode
+  stopbits: 1 | 1.5 | 2
+  timeout: number
+}
+
+/** Настройки приложения: два порта кольца + адрес узла */
 export interface SerialSettings {
   portCom1: string
   portCom2: string
   nodeAddress: NodeAddress
-  baudRate: number
-  dataBits: 5 | 6 | 7 | 8
-  parity: ParityOption
-  stopBits: 1 | 1.5 | 2
-  flowControl: FlowControlOption
-  readTimeout: number
-  writeTimeout: number
-  readBufferSize: number
-  writeBufferSize: number
-}
-
-export const DEFAULT_SETTINGS: SerialSettings = {
-  portCom1: 'COM1',
-  portCom2: 'COM2',
-  nodeAddress: 1,
-  baudRate: 9600,
-  dataBits: 8,
-  parity: 'none',
-  stopBits: 1,
-  flowControl: 'none',
-  readTimeout: 1000,
-  writeTimeout: 1000,
-  readBufferSize: 4096,
-  writeBufferSize: 2048,
+  com1: PortLineSettings
+  com2: PortLineSettings
 }
 
 export const DEFAULT_DESTINATION: Destination = 2
@@ -43,6 +44,79 @@ export const BAUD_RATES = [
   300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 56000, 57600, 115200,
   128000,
 ] as const
+
+export const DEFAULT_PORT_LINE: PortLineSettings = {
+  baudrate: 9600,
+  bytesize: 8,
+  parity: 'N',
+  stopbits: 1,
+  timeout: 1,
+}
+
+export const DEFAULT_SETTINGS: SerialSettings = {
+  portCom1: 'COM1',
+  portCom2: 'COM2',
+  nodeAddress: 1,
+  com1: { ...DEFAULT_PORT_LINE },
+  com2: { ...DEFAULT_PORT_LINE },
+}
+
+const PARITY_UI_TO_CODE: Record<string, ParityCode> = {
+  none: 'N',
+  even: 'E',
+  odd: 'O',
+  N: 'N',
+  E: 'E',
+  O: 'O',
+}
+
+export function parityUiToCode(value: string): ParityCode {
+  return PARITY_UI_TO_CODE[value.toLowerCase()] ?? 'N'
+}
+
+export const PARITY_LABELS: Record<ParityCode, string> = {
+  N: 'None',
+  E: 'Even',
+  O: 'Odd',
+}
+
+export function buildCOMPortSettings(
+  portName: string,
+  line: PortLineSettings,
+): COMPortSettings {
+  return { portName, ...line }
+}
+
+/** Миграция старого формата (один набор параметров на оба порта) */
+export function normalizeSerialSettings(raw: unknown): SerialSettings {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_SETTINGS }
+
+  const s = raw as Record<string, unknown>
+  if (s.com1 && s.com2) {
+    return {
+      ...DEFAULT_SETTINGS,
+      ...s,
+      com1: { ...DEFAULT_PORT_LINE, ...(s.com1 as PortLineSettings) },
+      com2: { ...DEFAULT_PORT_LINE, ...(s.com2 as PortLineSettings) },
+    } as SerialSettings
+  }
+
+  const legacyLine: PortLineSettings = {
+    baudrate: Number(s.baudRate ?? DEFAULT_PORT_LINE.baudrate),
+    bytesize: Number(s.dataBits ?? DEFAULT_PORT_LINE.bytesize) as PortLineSettings['bytesize'],
+    parity: parityUiToCode(String(s.parity ?? 'none')),
+    stopbits: Number(s.stopBits ?? DEFAULT_PORT_LINE.stopbits) as PortLineSettings['stopbits'],
+    timeout: DEFAULT_PORT_LINE.timeout,
+  }
+
+  return {
+    portCom1: String(s.portCom1 ?? DEFAULT_SETTINGS.portCom1),
+    portCom2: String(s.portCom2 ?? DEFAULT_SETTINGS.portCom2),
+    nodeAddress: (Number(s.nodeAddress) || 1) as NodeAddress,
+    com1: { ...legacyLine },
+    com2: { ...legacyLine },
+  }
+}
 
 export interface LogEntry {
   id: string

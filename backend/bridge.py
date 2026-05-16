@@ -1,80 +1,59 @@
 """
-Мост Eel — функции из req.py (контракт для React).
+Тонкий мост Eel → channel.stack.requirements.
+Преобразует только save_settings (dict с фронта) и open_physical_channel (адрес узла).
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from settings_store import load_settings, save_settings
-from state import state
+from phisical.physical import COMPortSettings
+from settings_store import load_settings, save_settings as persist_settings
 
-# --- Справочники и настройки ---
-
-
-def list_ports() -> dict[str, Any]:
-    s = load_settings()
-    ports = sorted({s.get("portCom1", "COM1"), s.get("portCom2", "COM2"), "COM1", "COM2", "COM3"})
-    return {"ok": True, "ports": list(ports)}
+from channel.stack import requirements as req
 
 
-def save_settings_bridge(data: dict[str, Any]) -> dict[str, Any]:
+def _line_to_com_port(port_name: str, line: dict[str, Any]) -> COMPortSettings:
+    return COMPortSettings(
+        port_name=port_name,
+        baudrate=int(line.get("baudrate", 9600)),
+        bytesize=int(line.get("bytesize", 8)),
+        parity=str(line.get("parity", "N")),
+        stopbits=float(line.get("stopbits", 1)),
+        timeout=float(line.get("timeout", 1.0)),
+    )
+
+
+def _apply_saved_settings(s: dict[str, Any]) -> None:
+    com1 = _line_to_com_port(s["portCom1"], s.get("com1", {}))
+    com2 = _line_to_com_port(s["portCom2"], s.get("com2", {}))
+    req.save_settings("input", com1)
+    req.save_settings("output", com2)
+
+
+def save_settings(data: dict[str, Any]) -> dict[str, Any]:
+    """Сохранить JSON с фронта и применить к rx/tx."""
     try:
-        save_settings(data)
+        merged = persist_settings(data)
+        _apply_saved_settings(merged)
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 
-# --- Физический уровень ---
-
-
 def open_physical_channel() -> dict[str, Any]:
-    s = load_settings()
-    if not s.get("portCom1") or not s.get("portCom2"):
-        return {"ok": False, "error": "Сначала сохраните параметры соединения"}
-    if state.physical_open:
-        return {"ok": True, "ports": state.open_ports}
-    # TODO: pyserial open
-    state.physical_open = True
-    state.open_ports = [s["portCom1"], s["portCom2"]]
-    return {"ok": True, "ports": state.open_ports}
-
-
-def close_physical_channel() -> dict[str, Any]:
-    if state.logical_connected:
-        disconnect_logical()
-    state.physical_open = False
-    state.open_ports = []
-    return {"ok": True}
-
-
-# --- Канальный уровень ---
-
-
-def connect_logical() -> dict[str, Any]:
-    if not state.physical_open:
-        return {"ok": False, "error": "Физический канал не открыт"}
-    # TODO: L-кадр, кольцо
-    state.logical_connected = True
-    return {"ok": True}
-
-
-def disconnect_logical() -> dict[str, Any]:
-    if not state.logical_connected:
-        return {"ok": False, "error": "Логическое соединение не установлено"}
-    state.logical_connected = False
-    return {"ok": True}
-
-
-# --- Прикладной уровень ---
-
-
-def send_message(text: str, destination: str | int) -> dict[str, Any]:
-    if not state.logical_connected:
-        return {"ok": False, "error": "Нет логического соединения"}
-    if not (text or "").strip():
-        return {"ok": False, "error": "Пустое сообщение"}
-    # TODO: кадры, адресация, CRC [7,4]
-    _ = destination
-    return {"ok": True}
+    """Открыть физический канал (номер узла из сохранённых настроек)."""
+    try:
+        s = load_settings()
+        if not s.get("portCom1") or not s.get("portCom2"):
+            return {"ok": False, "error": "Сначала сохраните параметры соединения"}
+        _apply_saved_settings(s)
+        result = req.open_physical_channel(int(s.get("nodeAddress", 1)))
+        if result.get("ok"):
+            return {
+                **result,
+                "ports": [s["portCom1"], s["portCom2"]],
+            }
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e)}

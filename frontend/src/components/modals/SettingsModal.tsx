@@ -1,6 +1,11 @@
 import { Modal } from '../ui/Modal'
-import type { FlowControlOption, NodeAddress, ParityOption, SerialSettings } from '../../types'
-import { BAUD_RATES } from '../../types'
+import type {
+  NodeAddress,
+  ParityCode,
+  PortLineSettings,
+  SerialSettings,
+} from '../../types'
+import { BAUD_RATES, PARITY_LABELS } from '../../types'
 
 type Props = {
   open: boolean
@@ -11,17 +16,83 @@ type Props = {
   onApply: () => void
 }
 
-const PARITY: { value: ParityOption; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'even', label: 'Even' },
-  { value: 'odd', label: 'Odd' },
-]
+const PARITY_OPTIONS = (Object.keys(PARITY_LABELS) as ParityCode[]).map((code) => ({
+  value: code,
+  label: PARITY_LABELS[code],
+}))
 
-const FLOW: { value: FlowControlOption; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'hardware', label: 'Hardware' },
-  { value: 'software', label: 'Software' },
-]
+type PortParamsProps = {
+  legend: string
+  line: PortLineSettings
+  onChange: (line: PortLineSettings) => void
+}
+
+function PortParamsFields({ legend, line, onChange }: PortParamsProps) {
+  const patch = (partial: Partial<PortLineSettings>) =>
+    onChange({ ...line, ...partial })
+
+  return (
+    <fieldset className="settings-group">
+      <legend>{legend}</legend>
+      <label className="settings-row">
+        <span>Бит в секунду:</span>
+        <select
+          value={line.baudrate}
+          onChange={(e) => patch({ baudrate: Number(e.target.value) })}
+        >
+          {BAUD_RATES.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="settings-row">
+        <span>Биты данных:</span>
+        <select
+          value={line.bytesize}
+          onChange={(e) =>
+            patch({ bytesize: Number(e.target.value) as PortLineSettings['bytesize'] })
+          }
+        >
+          {[5, 6, 7, 8].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="settings-row">
+        <span>Четность:</span>
+        <select
+          value={line.parity}
+          onChange={(e) => patch({ parity: e.target.value as ParityCode })}
+        >
+          {PARITY_OPTIONS.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="settings-row">
+        <span>Стоповые биты:</span>
+        <select
+          value={String(line.stopbits)}
+          onChange={(e) =>
+            patch({
+              stopbits: parseFloat(e.target.value) as PortLineSettings['stopbits'],
+            })
+          }
+        >
+          <option value="1">One</option>
+          <option value="1.5">OnePointFive</option>
+          <option value="2">Two</option>
+        </select>
+      </label>
+    </fieldset>
+  )
+}
 
 export function SettingsModal({
   open,
@@ -52,7 +123,7 @@ export function SettingsModal({
       open={open}
       title="Параметры соединения"
       onClose={onClose}
-      width="md"
+      width="lg"
       footer={footer}
     >
       <form
@@ -105,65 +176,17 @@ export function SettingsModal({
           </label>
         </fieldset>
 
-        <fieldset className="settings-group">
-          <legend>Параметры порта</legend>
-          <label className="settings-row">
-            <span>Бит в секунду:</span>
-            <select
-              value={settings.baudRate}
-              onChange={(e) => patch({ baudRate: Number(e.target.value) })}
-            >
-              {BAUD_RATES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="settings-row">
-            <span>Биты данных:</span>
-            <select
-              value={settings.dataBits}
-              onChange={(e) =>
-                patch({ dataBits: Number(e.target.value) as SerialSettings['dataBits'] })
-              }
-            >
-              {[5, 6, 7, 8].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="settings-row">
-            <span>Четность:</span>
-            <select
-              value={settings.parity}
-              onChange={(e) => patch({ parity: e.target.value as ParityOption })}
-            >
-              {PARITY.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="settings-row">
-            <span>Стоповые биты:</span>
-            <select
-              value={String(settings.stopBits)}
-              onChange={(e) =>
-                patch({
-                  stopBits: parseFloat(e.target.value) as SerialSettings['stopBits'],
-                })
-              }
-            >
-              <option value="1">One</option>
-              <option value="1.5">OnePointFive</option>
-              <option value="2">Two</option>
-            </select>
-          </label>
-        </fieldset>
+        <PortParamsFields
+          legend="Параметры COM1 (в кольцо)"
+          line={settings.com1}
+          onChange={(com1) => patch({ com1 })}
+        />
+        <PortParamsFields
+          legend="Параметры COM2 (из кольца)"
+          line={settings.com2}
+          onChange={(com2) => patch({ com2 })}
+        />
+
         <p className="form-note">
           OK сохраняет параметры. Физический канал открывается отдельной командой в окне
           «Соединение».

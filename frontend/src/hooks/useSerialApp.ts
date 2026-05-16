@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { api, DEMO_MODE } from '../api/client'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api, DEMO_MODE, isEelLoaded, isEelReady } from '../api/client'
 import type {
   ConnectionState,
   Destination,
@@ -11,8 +11,11 @@ import {
   DEFAULT_DESTINATION,
   DEFAULT_SETTINGS,
   DESTINATION_STORAGE_KEY,
+  normalizeSerialSettings,
   SETTINGS_STORAGE_KEY,
 } from '../types'
+
+const POLL_MS = 1000
 
 function nowTime() {
   return new Date().toLocaleTimeString('ru-RU', { hour12: false })
@@ -31,10 +34,17 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
+function loadSerialSettings(): SerialSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
+    return raw ? normalizeSerialSettings(JSON.parse(raw)) : DEFAULT_SETTINGS
+  } catch {
+    return DEFAULT_SETTINGS
+  }
+}
+
 export function useSerialApp() {
-  const [settings, setSettings] = useState<SerialSettings>(() =>
-    loadJson(SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS),
-  )
+  const [settings, setSettings] = useState<SerialSettings>(loadSerialSettings)
   const [destination, setDestination] = useState<Destination>(() =>
     loadJson(DESTINATION_STORAGE_KEY, DEFAULT_DESTINATION),
   )
@@ -45,6 +55,8 @@ export function useSerialApp() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [portOpenedAlert, setPortOpenedAlert] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [eelConnected, setEelConnected] = useState(isEelReady)
+  const pollInFlight = useRef(false)
 
   const pushLog = useCallback(
     (level: LogEntry['level'], message: string, frame?: FrameTypeCode) => {
@@ -57,6 +69,22 @@ export function useSerialApp() {
   )
 
   useEffect(() => {
+    const check = () => setEelConnected(isEelReady())
+    check()
+    const id = window.setInterval(check, 300)
+    return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (DEMO_MODE || eelConnected) return
+    if (isEelLoaded()) {
+      pushLog('warn', 'Ожидание WebSocket к бэкенду…')
+      return
+    }
+    pushLog('warn', 'Бэкенд не подключён. Запустите: python backend/run_server.py')
+  }, [eelConnected, pushLog])
+
+  useEffect(() => {
     api
       .listPorts()
       .then(setPorts)
@@ -64,7 +92,33 @@ export function useSerialApp() {
         pushLog('warn', 'Не удалось загрузить список портов')
         setPorts(['COM1', 'COM2', 'COM3'])
       })
-  }, [pushLog])
+  }, [pushLog, eelConnected])
+
+  // get_message на бэке требует открытый логический канал — не опрашиваем раньше времени
+  useEffect(() => {
+    if (!eelConnected || connection !== 'connected') return
+
+    const poll = async () => {
+      if (pollInFlight.current) return
+      pollInFlight.current = true
+      try {
+        const msg = await api.pollMessage()
+        if (msg) {
+          pushLog('success', `Получено сообщение: ${msg}`)
+        }
+      } catch (e) {
+        pushLog('error', e instanceof Error ? e.message : 'Ошибка опроса get_message')
+      } finally {
+        pollInFlight.current = false
+      }
+    }
+
+    const id = window.setInterval(() => {
+      void poll()
+    }, POLL_MS)
+
+    return () => window.clearInterval(id)
+  }, [eelConnected, connection, pushLog])
 
   const saveSettings = useCallback(async () => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
@@ -102,17 +156,20 @@ export function useSerialApp() {
   const closePhysical = useCallback(async () => {
     setBusy(true)
     try {
+      if (connection === 'connected') {
+        await api.disconnectLogical()
+        setConnection('disconnected')
+      }
       await api.closePhysicalChannel()
       setPortOpen(false)
       setOpenPorts([])
-      setConnection('disconnected')
       pushLog('info', 'Физический канал закрыт')
     } catch (e) {
       pushLog('error', e instanceof Error ? e.message : 'Ошибка закрытия канала')
     } finally {
       setBusy(false)
     }
-  }, [pushLog])
+  }, [connection, pushLog])
 
   const connectLink = useCallback(async () => {
     if (!portOpen) {
@@ -125,7 +182,6 @@ export function useSerialApp() {
       await api.connectLogical()
       setConnection('connected')
       pushLog('frame', 'Логическое соединение установлено (L-кадр)', 0x01)
-      if (DEMO_MODE) pushLog('frame', 'Ответ узла кольца', 0x01)
     } catch (e) {
       setConnection('disconnected')
       pushLog('error', e instanceof Error ? e.message : 'Ошибка соединения')
@@ -163,14 +219,8 @@ export function useSerialApp() {
       }
       setBusy(true)
       try {
-        if (DEMO_MODE) {
-          pushLog('info', `Сообщение → ${destLabel}: ${trimmed}`)
-          pushLog('frame', 'I-кадр, ACK', 0x03)
-          pushLog('success', 'Сообщение доставлено')
-        } else {
-          await api.sendMessage(trimmed, destination)
-          pushLog('success', `Сообщение отправлено (${destLabel})`)
-        }
+        await api.sendMessage(trimmed, destination)
+        pushLog('success', `Сообщение отправлено (${destLabel})`)
       } catch (e) {
         pushLog('error', e instanceof Error ? e.message : 'Ошибка отправки сообщения')
       } finally {
@@ -203,5 +253,6 @@ export function useSerialApp() {
     sendMessage,
     clearLogs,
     demoMode: DEMO_MODE,
+    eelConnected,
   }
 }

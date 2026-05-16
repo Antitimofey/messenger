@@ -36,3 +36,17 @@
 │  └──────────────────────┘     └─────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+# Запуск бекенда
+
+cd backend
+pip install -r requirements.txt
+python run_server.py
+
+
+# Запуск фронтенда
+
+cd frontend
+npm install
+npm run dev
+

@@ -1,14 +1,19 @@
 {
   "portCom1": "COM1",
-  "portCom2": "COM2",
-  "nodeAddress": 1,
-  "baudRate": 9600,
-  "dataBits": 8,
-  "parity": "none",
-  "stopBits": 1,
-  "flowControl": "none",
-  "readTimeout": 1000,
-  "writeTimeout": 1000,
-  "readBufferSize": 4096,
-  "writeBufferSize": 2048
+  "portCom2": "COM1",
+  "nodeAddress": 2,
+  "com1": {
+    "baudrate": 9600,
+    "bytesize": 8,
+    "parity": "E",
+    "stopbits": 2,
+    "timeout": 1
+  },
+  "com2": {
+    "baudrate": 9600,
+    "bytesize": 8,
+    "parity": "E",
+    "stopbits": 1.5,
+    "timeout": 1
+  }
 }
