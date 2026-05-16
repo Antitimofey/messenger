@@ -4,8 +4,7 @@ from enum import IntEnum
 from typing import Optional, Tuple, List
 import crcmod  # pip install crcmod
 import unittest
-from .frame import Frame, FrameType
-from hamming import Hamming74
+
 
 import sys
 from pathlib import Path
