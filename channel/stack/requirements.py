@@ -25,13 +25,6 @@ class COMPortSettings:
     stopbits: float = 1    # 1, 1.5, 2
     timeout: float = 1.0
 
-class SerialSettings(TypedDict, total=False):
-  # Структура для канального уровня
-  portCom1: str
-  portCom2: str
-  nodeAddress: int
-  baudRate: int
-
 
 rx_set = COMPortSettings(port_name='COM15', baudrate=19200)
 rx = COMPort(role="input", settings=rx_set)
