@@ -1,50 +1,74 @@
+import sys
 import threading
-from physical import COMPort
+from pathlib import Path
+
+# 1. Настройка путей. 
+# resolve().parent.parent выводит нас в D:\messenger\messenger
+root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(root))
+
+# 2. Импорт из файла physical.py, который лежит в той же папке
+try:
+    from physical import COMPort
+except ImportError:
+    # Если папка называется phisical (через i), а не physical
+    from phisical import COMPort
+
+# 3. Импорты из папки channel
+from channel.stack.requirements import COMPortSettings
+from channel.frame.encryptedFrame import EncryptedFrame
+from channel.frame.frame import FrameType
 
 MY_ADDRESS = 2
-RX_PORT = 'COM11'  # Получает от Узла 1
-TX_PORT = 'COM12'  # Отправляет Узлу 3
-BROADCAST = 255
+BROADCAST = 0x00
 
-print(f"=== Узел {MY_ADDRESS} запущен ===")
+def main():
+    print(f"=== Узел {MY_ADDRESS} запущен ===")
+    
+    rx_set = COMPortSettings(port_name='COM11', baudrate=19200)
+    tx_set = COMPortSettings(port_name='COM12', baudrate=19200)
 
-rx = COMPort('input')
-tx = COMPort('output')
+    rx = COMPort('input')
+    tx = COMPort('output')
 
-if not rx.open_port(RX_PORT, baudrate=19200) or not tx.open_port(TX_PORT, baudrate=19200):
-    print("❌ Ошибка открытия портов")
-    exit(1)
+    if not rx.open_port(rx_set) or not tx.open_port(tx_set):
+        print("❌ Ошибка портов.")
+        return
 
-def send_frame(dest, data):
-    payload = data.encode('utf-8')
-    frame = bytes([MY_ADDRESS, dest, len(payload)]) + payload
-    tx.send_bytes(frame)
-    print(f"📤 Отправлено узлу {dest}: {data}")
+    def receive_logic():
+        buffer = bytearray()
+        while rx.is_open():
+            byte = rx.receive_bytes(1)
+            if byte:
+                buffer.extend(byte)
+                if len(buffer) >= 2 and buffer[0] == 0x7E and buffer[-1] == 0x7E:
+                    try:
+                        frame = EncryptedFrame(raw_bytes=bytes(buffer))
+                        if frame.src_addr != MY_ADDRESS:
+                            if frame.dest_addr in [MY_ADDRESS, BROADCAST]:
+                                print(f"\n📥 ПОЛУЧЕНО от Узла {frame.src_addr}: {frame.get_data_as_text()}")
+                            if frame.dest_addr != MY_ADDRESS:
+                                tx.send_bytes(bytes(buffer))
+                    except Exception as e: print(f"\n⚠️ Ошибка: {e}")
+                    finally:
+                        buffer.clear()
+                        print("> ", end="", flush=True)
 
-def receive_logic():
+    threading.Thread(target=receive_logic, daemon=True).start()
+
     while True:
-        header = rx.receive_bytes(3)
-        if header and len(header) == 3:
-            src, dest, length = header[0], header[1], header[2]
-            payload = rx.receive_bytes(length)
-            
-            if src == MY_ADDRESS:
-                continue
+        try:
+            cmd = input("> ").split(" ", 2)
+            if not cmd or cmd[0] == "": continue
+            if cmd[0] == "exit": break
+            if cmd[0] == "send" and len(cmd) == 3:
+                dest = BROADCAST if cmd[1].lower() == "broadcast" else int(cmd[1])
+                msg = EncryptedFrame(dest, MY_ADDRESS, FrameType.DATA, cmd[2].encode('utf-8'))
+                tx.send_bytes(msg.encrypted_serialize())
+                print(f"📤 Отправлено")
+        except Exception as e: print(e)
 
-            if dest == MY_ADDRESS or dest == BROADCAST:
-                print(f"📥 ПОЛУЧЕНО от {src}: {payload.decode('utf-8')}")
-            
-            if dest != MY_ADDRESS:
-                print(f"⏩ РЕТРАНСЛЯЦИЯ дальше")
-                tx.send_bytes(header + payload)
+    rx.close_port(); tx.close_port()
 
-threading.Thread(target=receive_logic, daemon=True).start()
-
-while True:
-    cmd = input("> ").split(" ", 2)
-    if cmd[0] == "exit": break
-    if cmd[0] == "send" and len(cmd) == 3:
-        addr = BROADCAST if cmd[1] == "broadcast" else int(cmd[1])
-        send_frame(addr, cmd[2])
-
-rx.close_port(); tx.close_port()
+if __name__ == "__main__":
+    main()
