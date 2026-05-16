@@ -1,0 +1,66 @@
+:root {
+  --bg: #ece9d8;
+  --window: #f0f0f0;
+  --panel: #ffffff;
+  --border: #aca899;
+  --border-dark: #716f64;
+  --text: #000000;
+  --text-muted: #444444;
+  --titlebar: linear-gradient(180deg, #fff 0%, #e0e0e0 45%, #c8c8c8 100%);
+  --btn-face: #f0f0f0;
+  --btn-hover: #e8f4fc;
+  --log-bg: #ffffe1;
+  --status-bad: #c00000;
+  --status-ok: #008000;
+  --status-wait: #806000;
+  --link: #0066cc;
+  --shadow: 2px 2px 6px rgba(0, 0, 0, 0.25);
+
+  --sans: 'Segoe UI', Tahoma, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'Consolas', 'Courier New', monospace;
+
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text);
+  background: var(--bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
