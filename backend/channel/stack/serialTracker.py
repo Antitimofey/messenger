@@ -110,11 +110,12 @@ class SerialTracker:
     def start_listening(self):
         if self._is_running:
             return
-        
-        # Проверяем, что оба порта открыты
-        assert self.rx.open_port(), "Необходимо сначала открыть RX порт!"
-        assert self.tx.open_port(), "Необходимо сначала открыть TX порт!"
-        
+
+        if not self.rx.is_open() and not self.rx.open_port():
+            raise RuntimeError(f"Не удалось открыть RX порт {self.rx.settings.port_name}")
+        if not self.tx.is_open() and not self.tx.open_port():
+            raise RuntimeError(f"Не удалось открыть TX порт {self.tx.settings.port_name}")
+
         self._is_running = True
         self.listening_thread = threading.Thread(target=self.receive_message, daemon=True)
         self.listening_thread.start()

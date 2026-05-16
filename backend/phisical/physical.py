@@ -59,7 +59,8 @@ class COMPort:
                 bytesize=self.settings.bytesize,
                 parity=self.settings.parity,
                 stopbits=self.settings.stopbits,
-                timeout=self.settings.timeout
+                timeout=self.settings.timeout,
+                write_timeout=self.settings.timeout,
             )
             if self.debug_mode:
                 print(f"[{self.role}] Порт {self.settings.port_name} открыт.")
@@ -78,6 +79,7 @@ class COMPort:
                 self.serial.parity = self.settings.parity
                 self.serial.stopbits = self.settings.stopbits
                 self.serial.timeout = self.settings.timeout
+                self.serial.write_timeout = self.settings.timeout
             return True
         except Exception as e:
             print(f"[{self.role}] Ошибка обновления параметров: {e}")

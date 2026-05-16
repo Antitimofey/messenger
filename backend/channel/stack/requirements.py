@@ -122,9 +122,21 @@ def connect_logical() -> dict[str, Any]:
   """
   if not tracker.is_hpysical_open:
     return {"ok": False, "error": "для этого действия необходимо сначала открыть физический канал"}
-  
-  rx.open_port()
-  tx.open_port()
+
+  if not rx.open_port():
+    return {"ok": False, "error": f"Не удалось открыть порт приёма {rx.settings.port_name}"}
+  if not tx.open_port():
+    rx.close_port()
+    return {"ok": False, "error": f"Не удалось открыть порт передачи {tx.settings.port_name}"}
+
+  try:
+    tracker.start_listening()
+  except Exception as e:
+    tracker.stop_listening()
+    rx.close_port()
+    tx.close_port()
+    return {"ok": False, "error": str(e)}
+
   tracker.is_logical_open = True
   return {"ok": True, "error": "all fine"}
 
@@ -143,8 +155,13 @@ def disconnect_logical() -> dict[str, Any]:
   Возврат при ошибке:
     {"ok": False, "error": "Логическое соединение не установлено"}
   """
+  if not tracker.is_logical_open:
+    return {"ok": False, "error": "Логическое соединение не установлено"}
+
+  tracker.stop_listening()
   rx.close_port()
   tx.close_port()
+  tracker.is_logical_open = False
   return {"ok": True, "error": "seems fine"}
 
 
@@ -164,11 +181,11 @@ def send_message(text: str, destination: str) -> dict[str, Any]:
   """
   dest = 0 if (destination == "broadcast" or destination == "0") else int(destination)
   try:
-    exit_code = tracker.send_message(dest, text) != -1
+    sent = tracker.send_message(dest, text)
   except Exception as e:
     return {"ok": False, "error": f"during message sending exception oqured: {str(e)}"}
-  if exit_code == -1:
-    return {"ok": False, "error": "exit code == -1"}
+  if sent == -1:
+    return {"ok": False, "error": "Не удалось отправить в COM-порт (порт закрыт или ошибка записи)"}
   return {"ok": True, "error": "all fine"}
 
 
@@ -187,12 +204,14 @@ def get_message() -> dict[str, Any]:
   Возврат при ошибке:
     {"ok": False, "error": "..."}
   """
+  if not tracker.is_logical_open:
+    return {"ok": False, "error": "Нет логического соединения", "message": ""}
+
   try:
-    msg_data = tracker.get_message()
+    if tracker.queue.empty():
+      return {"ok": False, "error": "no more messages", "message": ""}
+    msg_data = tracker.queue.get_nowait()
+    return {"ok": True, "message": str(msg_data)}
   except Exception as e:
-    return {"ok": False, "error": f"during message getting exception oqured: {str(e)}"}
-  
-  if msg_data is not None:
-    return {"ok": True, "error": "all fine", "message": msg_data}
-  return {"ok": False, "error": "no more messages", "message": ""}
+    return {"ok": False, "error": f"during message getting exception oqured: {str(e)}", "message": ""}
   

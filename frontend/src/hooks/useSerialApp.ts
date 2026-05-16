@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, DEMO_MODE, isEelLoaded, isEelReady } from '../api/client'
+import { api, DEMO_MODE, isEelLoaded, isEelReady, setEelReady } from '../api/client'
+import { loadEelScript } from '../api/eelLoader'
 import type {
   ConnectionState,
   Destination,
@@ -74,6 +75,21 @@ export function useSerialApp() {
     const id = window.setInterval(check, 300)
     return () => window.clearInterval(id)
   }, [])
+
+  // После обрыва WS (ECONNRESET) — попытка переподключить, пока канал открыт
+  useEffect(() => {
+    if (DEMO_MODE || eelConnected || connection !== 'connected') return
+    let cancelled = false
+    void loadEelScript().then((ok) => {
+      if (!cancelled) {
+        setEelReady(ok)
+        if (ok) pushLog('info', 'Связь с бэкендом восстановлена')
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [eelConnected, connection, pushLog])
 
   useEffect(() => {
     if (DEMO_MODE || eelConnected) return

@@ -42,8 +42,11 @@ async function eelCall<T>(name: string, ...args: unknown[]): Promise<T> {
   const fn = eel[name]
   if (!fn) throw new Error(`Eel: функция ${name} не найдена`)
 
-  const callPromise = fn(...args)()
   let timeoutId: ReturnType<typeof setTimeout>
+  const callPromise = fn(...args)().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`eel.${name}: ${msg}`)
+  })
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(
       () => reject(new Error(`Таймаут eel.${name} (${EEL_TIMEOUT_MS} мс)`)),

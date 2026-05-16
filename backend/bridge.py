@@ -1,16 +1,31 @@
 """
 Тонкий мост Eel → channel.stack.requirements.
-Преобразует только save_settings (dict с фронта) и open_physical_channel (адрес узла).
+Безопасные обёртки: таймаут, чтобы COM/eel не блокировали WebSocket.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
+
+import gevent
+from gevent.timeout import Timeout as GeventTimeout
 
 from phisical.physical import COMPortSettings
 from settings_store import load_settings, save_settings as persist_settings
 
 from channel.stack import requirements as req
+
+EEL_CALL_TIMEOUT = 15.0
+
+
+def _eel_safe(fn: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -> dict[str, Any]:
+    try:
+        with GeventTimeout(EEL_CALL_TIMEOUT, False):
+            return fn(*args, **kwargs)
+    except GeventTimeout:
+        return {"ok": False, "error": f"Таймаут операции ({int(EEL_CALL_TIMEOUT)} с)"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def _line_to_com_port(port_name: str, line: dict[str, Any]) -> COMPortSettings:
@@ -31,8 +46,11 @@ def _apply_saved_settings(s: dict[str, Any]) -> None:
     req.save_settings("output", com2)
 
 
+def list_ports() -> dict[str, Any]:
+    return _eel_safe(req.list_ports)
+
+
 def save_settings(data: dict[str, Any]) -> dict[str, Any]:
-    """Сохранить JSON с фронта и применить к rx/tx."""
     try:
         merged = persist_settings(data)
         _apply_saved_settings(merged)
@@ -42,18 +60,34 @@ def save_settings(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def open_physical_channel() -> dict[str, Any]:
-    """Открыть физический канал (номер узла из сохранённых настроек)."""
     try:
         s = load_settings()
         if not s.get("portCom1") or not s.get("portCom2"):
             return {"ok": False, "error": "Сначала сохраните параметры соединения"}
         _apply_saved_settings(s)
-        result = req.open_physical_channel(int(s.get("nodeAddress", 1)))
+        result = _eel_safe(req.open_physical_channel, int(s.get("nodeAddress", 1)))
         if result.get("ok"):
-            return {
-                **result,
-                "ports": [s["portCom1"], s["portCom2"]],
-            }
+            return {**result, "ports": [s["portCom1"], s["portCom2"]]}
         return result
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+def close_physical_channel() -> dict[str, Any]:
+    return _eel_safe(req.close_physical_channel)
+
+
+def connect_logical() -> dict[str, Any]:
+    return _eel_safe(req.connect_logical)
+
+
+def disconnect_logical() -> dict[str, Any]:
+    return _eel_safe(req.disconnect_logical)
+
+
+def send_message(text: str, destination: str) -> dict[str, Any]:
+    return _eel_safe(req.send_message, text, str(destination))
+
+
+def get_message() -> dict[str, Any]:
+    return _eel_safe(req.get_message)

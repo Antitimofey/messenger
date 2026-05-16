@@ -24,25 +24,23 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", f"http://localhost:{FRONTEND_PORT
 import eel
 
 import bridge
-from channel.stack import requirements as req
 
 eel.init(str(EEL_WEB))
 
-eel.expose(req.list_ports)
+eel.expose(bridge.list_ports)
 eel.expose(bridge.save_settings)
 eel.expose(bridge.open_physical_channel)
-eel.expose(req.close_physical_channel)
-eel.expose(req.connect_logical)
-eel.expose(req.disconnect_logical)
-eel.expose(req.send_message)
-eel.expose(req.get_message)
+eel.expose(bridge.close_physical_channel)
+eel.expose(bridge.connect_logical)
+eel.expose(bridge.disconnect_logical)
+eel.expose(bridge.send_message)
+eel.expose(bridge.get_message)
 
 
 def main() -> None:
     print(f"Eel API: http://localhost:{BACKEND_PORT}")
     print(f"Ожидается фронтенд: {FRONTEND_ORIGIN}")
-    print("Загрузите eel.js с этого хоста во фронтенде (VITE_BACKEND_PORT).")
-    # mode=None — не открывать браузер; index.html — заглушка для API (eel.js)
+    print("Загрузите eel.js через Vite (/eel.js) при npm run dev.")
     eel.start(
         "index.html",
         host="localhost",
