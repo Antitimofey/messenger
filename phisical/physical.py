@@ -64,6 +64,28 @@ class COMPort:
             print(f"[{self.role}] Ошибка открытия {self.settings.port_name}: {e}")
             return False
 
+    def set_parameters(self, settings: COMPortSettings) -> bool:
+        """
+        Обновляет объект настроек и применяет их к открытому порту.
+        Позволяет менять скорость или четность без полного закрытия/открытия.
+        """
+        try:
+            self.settings = settings
+            if self.is_open():
+                # pyserial позволяет менять эти параметры на лету через свойства
+                self.serial.baudrate = self.settings.baudrate
+                self.serial.bytesize = self.settings.bytesize
+                self.serial.parity = self.settings.parity
+                self.serial.stopbits = self.settings.stopbits
+                self.serial.timeout = self.settings.timeout
+            
+            if self.debug_mode:
+                print(f"[{self.role}] Параметры обновлены: {self.settings.baudrate} bps")
+            return True
+        except Exception as e:
+            print(f"[{self.role}] Ошибка обновления параметров: {e}")
+            return False
+
     def close_port(self) -> bool:
         self.remove_receive_callback()
         if self.serial and self.serial.is_open:
