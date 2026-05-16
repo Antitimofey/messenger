@@ -118,7 +118,7 @@ class SerialTracker:
     def get_message(self):
         """ Извлечение сообщения из очереди главным (или другим) потоком """
         if not self.queue.empty():
-            return self.queue.get()
+            return str(self.queue.get())
         return None
 
 
