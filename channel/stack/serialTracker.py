@@ -25,12 +25,21 @@ class SerialTracker:
         self.my_addr = my_addr
         self.broadcast_addr = broadcast_addr
         
+        self.is_hpysical_open: bool = False
+        self.is_logical_open: bool = False
+        
         # queue.Queue потокобезопасна из коробки, семафоры не нужны
         self.queue = Queue() 
         
         # Флаг для контроля работы потока
         self._is_running = False
         self.listening_thread = None
+        
+    def check_channels(self):
+        if not self.is_hpysical_open:
+            raise Exception(f"для этого действия необходимо сначала открыть физический канал")
+        if not self.is_logical_open:
+            raise Exception(f"для этого действия необходимо сначала открыть логический канал")
 
 
     def send_message(self, dest_addr: int, message_text: str):
@@ -38,19 +47,20 @@ class SerialTracker:
             Конвертирует строку в EncryptedFrame и отправляет в TX порт.
             :param dest_addr: Адрес получателя (ID узла или BROADCAST)
             :param message_text: Текст сообщения для отправки
+            
+            :return -1 if error else other number
             """
-            try:
-                # Кодируем текст в байты и создаем объект кадра
-                frame = EncryptedFrame(
-                    dest_addr=dest_addr, 
-                    src_addr=self.my_addr, 
-                    frame_type=FrameType.DATA, 
-                    data=message_text.encode('utf-8')
-                )
-                # Сериализуем и отправляем в порт
-                self.tx.send_bytes(frame.encrypted_serialize())
-            except Exception as e:
-                print(f"\n⚠️ Ошибка при отправке сообщения: {e}")
+            self.check_channels()
+                
+            # Кодируем текст в байты и создаем объект кадра
+            frame = EncryptedFrame(
+                dest_addr=dest_addr, 
+                src_addr=self.my_addr, 
+                frame_type=FrameType.DATA, 
+                data=message_text.encode('utf-8')
+            )
+            # Сериализуем и отправляем в порт
+            return self.tx.send_bytes(frame.encrypted_serialize())
 
 
     def receive_message(self):
@@ -117,6 +127,8 @@ class SerialTracker:
 
     def get_message(self):
         """ Извлечение сообщения из очереди главным (или другим) потоком """
+        self.check_channels()
+        
         if not self.queue.empty():
             return str(self.queue.get())
         return None

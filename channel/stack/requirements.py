@@ -80,6 +80,7 @@ def open_physical_channel(computer_number: int) -> dict[str, Any]:
   """
   
   tracker.my_addr = computer_number
+  tracker.is_hpysical_open = True
   
   return {"ok": True, "error": "works fine"}
 
@@ -99,6 +100,8 @@ def close_physical_channel() -> dict[str, Any]:
   Возврат при ошибке:
     {"ok": False, "error": "…"}
   """
+  if tracker.is_logical_open:
+    return {"ok": False, "error": "для этого действия необходимо сначала \033[31mзакрыть\033[0m логический канал"}
   return {"ok": True, "error": "nothing to do"}
 
 
@@ -117,9 +120,13 @@ def connect_logical() -> dict[str, Any]:
     {"ok": False, "error": "Физический канал не открыт"}
     {"ok": False, "error": "Узел 2 не отвечает (таймаут)"}
   """
+  if not tracker.is_hpysical_open:
+    return {"ok": False, "error": "для этого действия необходимо сначала открыть физический канал"}
+  
   rx.open_port()
   tx.open_port()
-  return {"ok": False, "error": "not implemented"}
+  tracker.is_logical_open = True
+  return {"ok": True, "error": "all fine"}
 
 
 def disconnect_logical() -> dict[str, Any]:
@@ -138,7 +145,7 @@ def disconnect_logical() -> dict[str, Any]:
   """
   rx.close_port()
   tx.close_port()
-  return {"ok": False, "error": "not implemented"}
+  return {"ok": True, "error": "seems fine"}
 
 
 def send_message(text: str, destination: str) -> dict[str, Any]:
@@ -155,9 +162,15 @@ def send_message(text: str, destination: str) -> dict[str, Any]:
     ... другие ошибки ...
     {"ok": False, "error": "Пустое сообщение"}
   """
-  dest = 0 if destination == "broadcast" else int(destination)
-  tracker.send_message(dest, text)
+  dest = 0 if (destination == "broadcast" or destination == "0") else int(destination)
+  try:
+    exit_code = tracker.send_message(dest, text) != -1
+  except Exception as e:
+    return {"ok": False, "error": f"during message sending exception oqured: {str(e)}"}
+  if exit_code == -1:
+    return {"ok": False, "error": "exit code == -1"}
   return {"ok": True, "error": "all fine"}
+
 
 def get_message() -> dict[str, Any]:
   """
@@ -174,7 +187,11 @@ def get_message() -> dict[str, Any]:
   Возврат при ошибке:
     {"ok": False, "error": "..."}
   """
-  msg_data = tracker.get_message()
+  try:
+    msg_data = tracker.get_message()
+  except Exception as e:
+    return {"ok": False, "error": f"during message getting exception oqured: {str(e)}"}
+  
   if msg_data is not None:
     return {"ok": True, "error": "all fine", "message": msg_data}
   return {"ok": False, "error": "no more messages", "message": ""}
