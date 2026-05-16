@@ -42,8 +42,8 @@ class SerialTracker:
             try:
                 # Кодируем текст в байты и создаем объект кадра
                 frame = EncryptedFrame(
-                    dest=dest_addr, 
-                    src=self.my_addr, 
+                    dest_addr=dest_addr, 
+                    src_addr=self.my_addr, 
                     frame_type=FrameType.DATA, 
                     data=message_text.encode('utf-8')
                 )
