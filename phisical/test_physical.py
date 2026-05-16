@@ -15,6 +15,9 @@ def main():
     ports = get_available_ports()
     print(f"\nДоступные порты: {ports}")
     
+    while(True):
+        continue
+
     # Берём пару COM10 и COM11
     tx_port_name = 'COM10'
     rx_port_name = 'COM11'
