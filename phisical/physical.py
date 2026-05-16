@@ -10,21 +10,25 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Optional, Callable, List
-
+from typing import Optional, Callable, List, Tuple
+from dataclasses import dataclass
 import serial
 import serial.tools.list_ports
 
-# Настройка путей, чтобы физический уровень видел папку channel
+# Настройка путей
 project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-try:
-    from channel.stack.requirements import COMPortSettings
-except ImportError:
-    print("Ошибка: Не удалось найти channel.stack.requirements. Проверьте структуру папок.")
-    raise
+@dataclass
+class COMPortSettings:
+    """Класс для хранения параметров соединения COM-порта"""
+    port_name: str = ""
+    baudrate: int = 19200
+    bytesize: int = 8
+    parity: str = 'N'      # 'N' (None), 'E' (Even), 'O' (Odd)
+    stopbits: float = 1    # 1, 1.5, 2
+    timeout: float = 1.0
 
 class COMPort:
     """
@@ -65,22 +69,15 @@ class COMPort:
             return False
 
     def set_parameters(self, settings: COMPortSettings) -> bool:
-        """
-        Обновляет объект настроек и применяет их к открытому порту.
-        Позволяет менять скорость или четность без полного закрытия/открытия.
-        """
+        """Обновляет параметры открытого порта."""
         try:
             self.settings = settings
             if self.is_open():
-                # pyserial позволяет менять эти параметры на лету через свойства
                 self.serial.baudrate = self.settings.baudrate
                 self.serial.bytesize = self.settings.bytesize
                 self.serial.parity = self.settings.parity
                 self.serial.stopbits = self.settings.stopbits
                 self.serial.timeout = self.settings.timeout
-            
-            if self.debug_mode:
-                print(f"[{self.role}] Параметры обновлены: {self.settings.baudrate} bps")
             return True
         except Exception as e:
             print(f"[{self.role}] Ошибка обновления параметров: {e}")
@@ -136,9 +133,7 @@ class COMPort:
     def set_debug(self, state: bool):
         self.debug_mode = state
 
-
 def get_available_ports() -> List[str]:
-    """Возвращает простой список имен доступных COM-портов."""
     return [port.device for port in serial.tools.list_ports.comports()]
 
 def list_ports_with_details() -> List[tuple[str, str, str]]:

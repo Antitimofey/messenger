@@ -1,29 +1,14 @@
-from dataclasses import dataclass
-from typing import Any, TypedDict, Optional
-
-import threading
-import typing
 import sys
 from pathlib import Path
-from queue import Queue
+from typing import Any
+
+# Настройка путей
 current_dir = Path(__file__).resolve().parent
 project_root = current_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
-from phisical.physical import get_available_ports
+from phisical.physical import COMPort, COMPortSettings, get_available_ports
 from channel.stack.serialTracker import SerialTracker
-from phisical.physical import COMPort
-
-
-@dataclass
-class COMPortSettings:
-    """Класс для хранения параметров соединения COM-порта"""
-    port_name: str = ""
-    baudrate: int = 19200
-    bytesize: int = 8
-    parity: str = 'N'      # 'N' (None), 'E' (Even), 'O' (Odd)
-    stopbits: float = 1    # 1, 1.5, 2
-    timeout: float = 1.0
 
 
 rx_set = COMPortSettings(port_name='COM15', baudrate=19200)
