@@ -1,5 +1,9 @@
+from typing import TypedDict, Any
+
 class SerialSettings(TypedDict, total=False):
   # посмотри, че в дисе у меня в выборе и придумай структуру, главное дай мне ее
+  pass
+
 
 def list_ports() -> dict[str, Any]:
   """
