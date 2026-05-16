@@ -40,7 +40,6 @@ tx_set = COMPortSettings(port_name='COM10', baudrate=19200)
 tx = COMPort(role="output", settings=tx_set)
 
 tracker = SerialTracker(rx, tx)
-{"ok": True, "error": "all fine", "message": msg_data}
 
 def list_ports() -> dict[str, Any]:
   """
