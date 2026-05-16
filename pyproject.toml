@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "messenger"
+version = "0.1.0"
+description = "Сетевой мессенджер для БМСТУ"
+dependencies = []
+
+# Добавьте эти строки:
+[tool.setuptools.packages.find]
+include = ["channel*", "phisical*"]
