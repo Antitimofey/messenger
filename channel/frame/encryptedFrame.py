@@ -7,6 +7,18 @@ import unittest
 from frame import Frame, FrameType
 from hamming import Hamming74
 
+import sys
+from pathlib import Path
+# Получаем абсолютный путь к директории, где лежит текущий файл
+current_dir = Path(__file__).resolve().parent
+# Поднимаемся на два уровня вверх (аналог двух dirname)
+project_root = current_dir.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Теперь импорты отработают корректно на любой ОС
+from channel.frame.frame import Frame, FrameType
+from channel.frame.hamming import Hamming74
+# from channel.frame.encryptedFrame import EncryptedFrame 
 
 
 class EncryptedFrame(Frame):
