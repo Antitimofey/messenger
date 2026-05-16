@@ -12,6 +12,7 @@ import {
   DEFAULT_DESTINATION,
   DEFAULT_SETTINGS,
   DESTINATION_STORAGE_KEY,
+  normalizeDestination,
   normalizeSerialSettings,
   SETTINGS_STORAGE_KEY,
 } from '../types'
@@ -26,15 +27,6 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function loadJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? ({ ...fallback, ...JSON.parse(raw) } as T) : fallback
-  } catch {
-    return fallback
-  }
-}
-
 function loadSerialSettings(): SerialSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
@@ -46,9 +38,14 @@ function loadSerialSettings(): SerialSettings {
 
 export function useSerialApp() {
   const [settings, setSettings] = useState<SerialSettings>(loadSerialSettings)
-  const [destination, setDestination] = useState<Destination>(() =>
-    loadJson(DESTINATION_STORAGE_KEY, DEFAULT_DESTINATION),
-  )
+  const [destination, setDestination] = useState<Destination>(() => {
+    try {
+      const raw = localStorage.getItem(DESTINATION_STORAGE_KEY)
+      return raw ? normalizeDestination(JSON.parse(raw)) : DEFAULT_DESTINATION
+    } catch {
+      return DEFAULT_DESTINATION
+    }
+  })
   const [ports, setPorts] = useState<string[]>([])
   const [connection, setConnection] = useState<ConnectionState>('disconnected')
   const [portOpen, setPortOpen] = useState(false)
@@ -150,8 +147,9 @@ export function useSerialApp() {
   }, [settings, pushLog])
 
   const setDestinationAndStore = useCallback((d: Destination) => {
-    setDestination(d)
-    localStorage.setItem(DESTINATION_STORAGE_KEY, JSON.stringify(d))
+    const normalized = normalizeDestination(d)
+    setDestination(normalized)
+    localStorage.setItem(DESTINATION_STORAGE_KEY, JSON.stringify(normalized))
   }, [])
 
   const openPhysical = useCallback(async () => {

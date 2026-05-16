@@ -165,6 +165,20 @@ def disconnect_logical() -> dict[str, Any]:
   return {"ok": True, "error": "seems fine"}
 
 
+def _parse_destination(destination: Any) -> int:
+  """1|2|3 -> addr, broadcast/0 -> 0. Безопасно для str/int и ошибочного '[object Object]'."""
+  if isinstance(destination, dict):
+    destination = destination.get("destination", destination.get("value", ""))
+  if isinstance(destination, (int, float)):
+    return 0 if int(destination) == 0 else int(destination)
+  s = str(destination).strip().lower()
+  if s in ("broadcast", "0", "всем (широковещание)"):
+    return 0
+  if "object object" in s:
+    raise ValueError("Некорректный получатель (передан объект). Выберите узел 1, 2, 3 или «Всем».")
+  return int(s)
+
+
 def send_message(text: str, destination: str) -> dict[str, Any]:
   """
   Аргументы:
@@ -179,9 +193,17 @@ def send_message(text: str, destination: str) -> dict[str, Any]:
     ... другие ошибки ...
     {"ok": False, "error": "Пустое сообщение"}
   """
-  dest = 0 if (destination == "broadcast" or destination == "0") else int(destination)
+  if isinstance(text, dict):
+    destination = text.get("destination", destination)
+    text = text.get("text", "")
+
   try:
-    sent = tracker.send_message(dest, text)
+    dest = _parse_destination(destination)
+  except (TypeError, ValueError) as e:
+    return {"ok": False, "error": f"Некорректный получатель: {e}"}
+
+  try:
+    sent = tracker.send_message(dest, str(text))
   except Exception as e:
     return {"ok": False, "error": f"during message sending exception oqured: {str(e)}"}
   if sent == -1:

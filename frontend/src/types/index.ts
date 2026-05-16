@@ -40,6 +40,19 @@ export interface SerialSettings {
 
 export const DEFAULT_DESTINATION: Destination = 2
 
+/** Нормализация получателя из state / localStorage / select */
+export function normalizeDestination(raw: unknown): Destination {
+  if (raw === 'broadcast' || raw === 0 || raw === '0') return 'broadcast'
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (n === 1 || n === 2 || n === 3) return n as NodeAddress
+  return DEFAULT_DESTINATION
+}
+
+/** Строка для Eel/Python: "1" | "2" | "3" | "broadcast" */
+export function destinationToApiArg(destination: Destination): string {
+  return destination === 'broadcast' ? 'broadcast' : String(destination)
+}
+
 export const BAUD_RATES = [
   300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 56000, 57600, 115200,
   128000,

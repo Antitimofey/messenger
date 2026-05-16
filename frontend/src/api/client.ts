@@ -1,4 +1,5 @@
 import type { ApiResult, Destination, SerialSettings } from '../types'
+import { destinationToApiArg, normalizeDestination } from '../types'
 
 export const USE_EEL = import.meta.env.VITE_USE_EEL !== 'false'
 export const DEMO_MODE =
@@ -144,8 +145,9 @@ export const api = {
 
   async sendMessage(text: string, destination: Destination): Promise<void> {
     if (isEelReady()) {
-      const dest = destination === 'broadcast' ? 'broadcast' : String(destination)
-      failIfNotOk(await eelCall<ApiResult>('send_message', text, dest))
+      const dest = destinationToApiArg(normalizeDestination(destination))
+      const body = String(text ?? '').trim()
+      failIfNotOk(await eelCall<ApiResult>('send_message', body, dest))
       return
     }
     if (DEMO_MODE) return
